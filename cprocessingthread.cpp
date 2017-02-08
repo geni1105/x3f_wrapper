@@ -98,22 +98,21 @@ bool CProcessingThread::runX3FConversion(const QUrl& fileName, const QStringList
     return true;
 }
 
-bool CProcessingThread::runExifTool(const QUrl& fileName){
-    QString exiftools = settings->value(SettingsConstants::exifToolsLocation).toString();
-    int format = settings->value(SettingsConstants::outputFormat).toInt();
-    if (exiftools.length() < 1){
-        return false;  // no specified exif tool location, so don't run it
-    }
-    QFileInfo info(exiftools);
-    if (!info.isExecutable()){
-        return false;  // not an executable
-    }
+bool CProcessingThread::runExifTool(QString exiftools, const QUrl& fileName, QString flatfield_correction){
+
+    // availability of exiftool to be checked by caller
+
     QStringList exiftoolsargs;
     exiftoolsargs << "-overwrite_original";
+    if( flatfield_correction != "")
+        exiftoolsargs << flatfield_correction;
     exiftoolsargs << "-tagsFromFile";
     exiftoolsargs << fileName.toLocalFile();
     exiftoolsargs << "-all:all";
+
     int exitCode = 0;
+
+    int format = settings->value(SettingsConstants::outputFormat).toInt();
     switch(format){
     case 1:
         //immaterial for jpgs
@@ -141,9 +140,95 @@ bool CProcessingThread::runExifTool(const QUrl& fileName){
     return true;
 }
 
+bool CProcessingThread::runExifTool_GetFFParam(QString exiftools, const QUrl& fileName, QString& opcode_filename){
+
+    // availability of exiftool to be checked by caller
+
+    QStringList exiftoolsargs;
+    exiftoolsargs << "-aperture";
+    exiftoolsargs << "-model";
+    exiftoolsargs << "-lensid";
+    exiftoolsargs << fileName.toLocalFile();
+
+    QProcess exiftool_process;
+
+    exiftool_process.start(exiftools, exiftoolsargs);
+    exiftool_process.waitForFinished(); // sets current thread to sleep and waits for exiftool_process end
+    QString exiftool_output(exiftool_process.readAllStandardOutput());
+
+    QString model_id;
+    if (exiftool_output.contains("SIGMA DP1 Merrill"))
+        model_id = "DP1M";
+    else if (exiftool_output.contains("SIGMA DP2 Merrill"))
+        model_id = "DP2M";
+    else if (exiftool_output.contains("SIGMA DP3 Merrill"))
+        model_id = "DP3M";
+    else if (exiftool_output.contains("SIGMA SD1 Merrill"))
+        model_id = "SD1M";
+    else if (exiftool_output.contains("SIGMA SD1"))
+        model_id = "SD1";
+    else {
+        emit error_message("Warning","No Merrill model ID EXIF data found!");
+        return false;
+    }
+
+    QString aperture;
+    int index;
+    if (( index = exiftool_output.indexOf("Aperture                        : ")) < 0) {
+        emit error_message("Warning","No aperture EXIF data found!");
+        return false;
+    }
+    index += 34;
+    while (exiftool_output.at(index) != '\n')
+        aperture += exiftool_output.at(index++);
+
+    QString lens_id;
+    if (( index = exiftool_output.indexOf("Lens ID                         : ")) < 0) {
+        emit error_message("Warning","No lens ID EXIF data found!");
+        return false;
+    }
+    index += 34;
+    while (exiftool_output.at(index) != '\n')
+        lens_id += exiftool_output.at(index++);
+    lens_id.replace(' ','_');
+
+    if ((model_id == "SD1M") || (model_id == "SD1"))
+        opcode_filename = model_id + "_" + lens_id + "_FF_DNG_Opcodelist3_" + aperture;
+    else
+        opcode_filename = model_id + "_FF_DNG_Opcodelist3_" + aperture;
+
+    return true;
+}
+
 void CProcessingThread::convertX3FFile(const QUrl& fileName, const QStringList& inArgs){
     if (runX3FConversion(fileName, inArgs) && mRunning){
-        runExifTool(fileName);
+
+        QString exiftools = settings->value(SettingsConstants::exifToolsLocation).toString();
+        if (exiftools.length() < 1){
+            return;  // no specified exif tool location, so don't run exiftools
+        }
+        QFileInfo info(exiftools);
+        if (!info.isExecutable()){
+            return;  // not an executable, so don't run exiftools
+        }
+
+        int format = settings->value(SettingsConstants::outputFormat).toInt();
+
+        QString opcode_param = "";
+        QString opcode_filename = "";
+        if((format == 0) && (settings->value(SettingsConstants::flatfield).toBool())) {  // DNG output and flat-fielding
+            if(runExifTool_GetFFParam(exiftools, fileName, opcode_filename)) {
+                opcode_filename = settings->value(SettingsConstants::dngOpcodeLocation).toString() + "/" + opcode_filename;
+
+                QFileInfo check_file(opcode_filename);
+                    // check if opcode file exists and if yes: Is it really a file and not a directory?
+                if( check_file.exists() && check_file.isFile() )
+                    opcode_param = "-opcodelist3<=" + opcode_filename;
+                else
+                    emit error_message("Warning", "Flat-Field Correction Opcodes not found: \n" + opcode_filename);
+            }
+        }
+        runExifTool(exiftools, fileName, opcode_param);
     }
 }
 

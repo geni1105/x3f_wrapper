@@ -15,6 +15,8 @@ public:
     static const QString outputFormat;      //type = int
     static const QString x3fLocation;       //type = string
     static const QString exifToolsLocation; //type = string
+    static const QString flatfield;         //type = bool
+    static const QString dngOpcodeLocation; //type = string
 
     static const QStringList wbOptions;
     static const QStringList colorOptions;
@@ -33,6 +35,8 @@ public:
     static const QString x3fLocationDefault;
 #endif
     static const QString exifToolsLocationDefault;
+    static const bool flatfieldDefault;
+    static const QString dngOpcodeLocationDefault;
 
     static bool checkSettings(const bool &performExifToolsChecks);
 };

@@ -37,6 +37,8 @@ int main(int argc, char *argv[])
                           SettingsConstants::x3fLocationDefault);
         settings.setValue(SettingsConstants::exifToolsLocation,
                           SettingsConstants::exifToolsLocationDefault);
+        settings.setValue(SettingsConstants::dngOpcodeLocation,
+                          SettingsConstants::dngOpcodeLocationDefault);
         settings.sync();
     }
 

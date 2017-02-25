@@ -191,6 +191,8 @@ bool CProcessingThread::runExifTool_GetFFParam(QString exiftools, const QUrl& fi
     while (exiftool_output.at(index) != '\n')
         lens_id += exiftool_output.at(index++);
     lens_id.replace(' ','_');
+    lens_id.replace('|','_');  // for Sigma Art Lenses, there sometimes is an '|' in the name --> invalid on most OSs
+
 
     if ((model_id == "SD1M") || (model_id == "SD1"))
         opcode_filename = model_id + "_" + lens_id + "_FF_DNG_Opcodelist3_" + aperture;

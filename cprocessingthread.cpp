@@ -98,7 +98,7 @@ bool CProcessingThread::runX3FConversion(const QUrl& fileName, const QStringList
     return true;
 }
 
-bool CProcessingThread::runExifTool(QString exiftools, const QUrl& fileName, QString flatfield_correction){
+bool CProcessingThread::runExifTool(QString exiftools, const QUrl& fileName, const QString& flatfield_correction){
 
     // availability of exiftool to be checked by caller
 
@@ -140,9 +140,14 @@ bool CProcessingThread::runExifTool(QString exiftools, const QUrl& fileName, QSt
     return true;
 }
 
-bool CProcessingThread::runExifTool_GetFFParam(QString exiftools, const QUrl& fileName, QString& opcode_filename){
+QString CProcessingThread::runExifTool_GetFFParam(const QString& exiftools,
+                                                  const QUrl& fileName,
+                                                  const bool& verbose){
 
     // availability of exiftool to be checked by caller
+    // returns a blank string if no opcodes are available for this file
+
+    QString output_string = "";
 
     QStringList exiftoolsargs;
     exiftoolsargs << "-aperture";
@@ -168,24 +173,26 @@ bool CProcessingThread::runExifTool_GetFFParam(QString exiftools, const QUrl& fi
     else if (exiftool_output.contains("SIGMA SD1"))
         model_id = "SD1";
     else {
-        emit error_message("Warning","No Merrill model ID EXIF data found!");
-        return false;
+        if (verbose){ // if it's not a Merrill, don't emit anything.  This emission slows down the batch process.
+            emit error_message("Warning","No Merrill model ID EXIF data found!");
+        }
+        return output_string;
     }
 
     QString aperture;
     int index;
     if (( index = exiftool_output.indexOf("Aperture                        : ")) < 0) {
         emit error_message("Warning","No aperture EXIF data found!");
-        return false;
+        return output_string;
     }
-    index += 34;
+    index += 34;  //34 seems like a bit of a magic number; could the string instead be split?
     while (exiftool_output.at(index) != '\n')
         aperture += exiftool_output.at(index++);
 
     QString lens_id;
     if (( index = exiftool_output.indexOf("Lens ID                         : ")) < 0) {
         emit error_message("Warning","No lens ID EXIF data found!");
-        return false;
+        return output_string;
     }
     index += 34;
     while (exiftool_output.at(index) != '\n')
@@ -193,13 +200,12 @@ bool CProcessingThread::runExifTool_GetFFParam(QString exiftools, const QUrl& fi
     lens_id.replace(' ','_');
     lens_id.replace('|','_');  // for Sigma Art Lenses, there sometimes is an '|' in the name --> invalid in a file name on most OSs
 
-
     if ((model_id == "SD1M") || (model_id == "SD1"))
-        opcode_filename = model_id + "_" + lens_id + "_FF_DNG_Opcodelist3_" + aperture;
+        output_string = model_id + "_" + lens_id + "_FF_DNG_Opcodelist3_" + aperture;
     else
-        opcode_filename = model_id + "_FF_DNG_Opcodelist3_" + aperture;
+        output_string = model_id + "_FF_DNG_Opcodelist3_" + aperture;
 
-    return true;
+    return output_string;
 }
 
 void CProcessingThread::convertX3FFile(const QUrl& fileName, const QStringList& inArgs){
@@ -217,17 +223,18 @@ void CProcessingThread::convertX3FFile(const QUrl& fileName, const QStringList& 
         int format = settings->value(SettingsConstants::outputFormat).toInt();
 
         QString opcode_param = "";
-        QString opcode_filename = "";
+        QString opcode_filename = runExifTool_GetFFParam(exiftools, fileName, false);
         if((format == 0) && (settings->value(SettingsConstants::flatfield).toBool())) {  // DNG output and flat-fielding
-            if(runExifTool_GetFFParam(exiftools, fileName, opcode_filename)) {
-                opcode_filename = settings->value(SettingsConstants::dngOpcodeLocation).toString() + "/" + opcode_filename;
-
-                QFileInfo check_file(opcode_filename);
-                    // check if opcode file exists and if yes: Is it really a file and not a directory?
-                if( check_file.exists() && check_file.isFile() )
-                    opcode_param = "-opcodelist3<=" + opcode_filename;
-                else
-                    emit error_message("Warning", "Flat-Field Correction Opcodes not found: \n" + opcode_filename);
+            QString full_opcode_filename = settings->value(SettingsConstants::dngOpcodeLocation).toString() + "/" + opcode_filename;
+            //keep the original file name around to check to see if we need to emit a warning
+            QFileInfo check_file(full_opcode_filename);
+                // check if opcode file exists and if yes: Is it really a file and not a directory?
+            if( check_file.exists() && check_file.isFile() )
+                opcode_param = "-opcodelist3<=" + full_opcode_filename;
+            else {
+                if (opcode_filename != ""){ // if we don't have the opcode but we should, emit a warning.
+                    emit error_message("Warning", "Flat-Field Correction Opcodes not found: \n" + full_opcode_filename);
+                }
             }
         }
         runExifTool(exiftools, fileName, opcode_param);

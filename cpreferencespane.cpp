@@ -147,7 +147,7 @@ void CPreferencesPane::resetPreferences(){
     whiteBalanceComboBox->setCurrentIndex(SettingsConstants::outputWBDefault);
     extractLocation->setText(SettingsConstants::x3fLocationDefault);
     exiftoolsLocation->setText(SettingsConstants::exifToolsLocationDefault);
-    dngOpcodeLocation->setText(SettingsConstants::dngOpcodeLocation);
+    dngOpcodeLocation->setText(SettingsConstants::dngOpcodeLocationDefault);
     savePreferences();
 }
 

@@ -54,10 +54,12 @@ const QString SettingsConstants::x3fLocationDefault =
         QDir::currentPath() + "/x3f_extract.exe";  // only for windows!
 const QString SettingsConstants::exifToolsLocationDefault =
         QDir::currentPath() + "/exiftool.exe";  // only for windows!
+const QString SettingsConstants::dngOpcodeLocationDefault =
+        QDir::currentPath() + "/opcodes";
 #elif defined(Q_OS_DARWIN) || defined(Q_OS_DARWIN64) || defined(Q_OS_MAC) || defined(Q_OS_MAC64) || defined(Q_OS_MACX) || defined(Q_OS_OSX)
-QString SettingsConstants::x3fLocationDefault = "/x3f_extract";  // can't be a static const because of the way mac loads things
-const QString SettingsConstants::exifToolsLocationDefault = "/usr/local/bin/exiftool";
-const QString SettingsConstants::dngOpcodeLocationDefault = "No known default";
+QString SettingsConstants::x3fLocationDefault = "/x3f_extract_mac";  // can't be a static const because of the way mac loads things
+QString SettingsConstants::exifToolsLocationDefault = "/usr/local/bin/exiftool";
+QString SettingsConstants::dngOpcodeLocationDefault = "/opcodes";  //both opcodes and the x3f_extract settings are actually set in main, not here
 #elif defined(Q_OS_LINUX)
 const QString SettingsConstants::x3fLocationDefault =
         QDir::currentPath() + "\x3f_extract";  // maybe also for linux?
